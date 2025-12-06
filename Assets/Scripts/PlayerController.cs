@@ -27,6 +27,11 @@ public class PlayerController : MonoBehaviour
     private Vector2 moveInput;
     private bool isAttacking = false;
 
+    [Header("Combat Settings")]
+    public int attackCount = 3;  // how many attack animations you have
+    private int lastAttackIndex = 0;
+
+
     private void Awake()
     {
         // Auto-assign references if missing
@@ -92,11 +97,16 @@ public class PlayerController : MonoBehaviour
     private IEnumerator AttackRoutine()
     {
         isAttacking = true;
+
+        // pick random attack index
+        int atkIndex = Random.Range(0, attackCount);
+        animator.SetInteger("AttackIndex", atkIndex);
+
         animator.SetTrigger("Attack");
 
-        // Wait for animation timing (tweak to match your animation)
         yield return new WaitForSeconds(0.15f);
 
+        // Damage hitbox trigger
         Vector3 center = transform.position + transform.forward * attackRange * 0.6f;
         Collider[] hits = Physics.OverlapSphere(center, attackRange, hittableLayers);
 
@@ -105,14 +115,14 @@ public class PlayerController : MonoBehaviour
             if (hit.TryGetComponent(out Health health))
                 health.TakeDamage(attackDamage);
 
-            if (hit.TryGetComponent(out BreakableObject breakable))
-                breakable.Break();
+            if (hit.TryGetComponent(out BreakableObject brk))
+                brk.Break();
         }
 
-        // Attack cooldown
         yield return new WaitForSeconds(0.25f);
         isAttacking = false;
     }
+
 
     private void OnDrawGizmosSelected()
     {

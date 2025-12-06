@@ -16,41 +16,21 @@ public class Health : MonoBehaviour
 
     private PlayerController player;
 
+    private Renderer[] cachedRenderers;
+    private Color[] originalColors;
+
     private void Awake()
     {
         currentHP = maxHP;
         player = GetComponent<PlayerController>();
+
+        // Cache renderers for flashing (player only)
+        cachedRenderers = GetComponentsInChildren<Renderer>();
+        originalColors = new Color[cachedRenderers.Length];
+
+        for (int i = 0; i < cachedRenderers.Length; i++)
+            originalColors[i] = cachedRenderers[i].material.color;
     }
-
-    public void FlashRenderers(float duration)
-    {
-        StartCoroutine(FlashRoutine(duration));
-    }
-
-    private IEnumerator FlashRoutine(float duration)
-    {
-        // Get all renderers (SkinnedMeshRenderer, MeshRenderer)
-        Renderer[] rends = GetComponentsInChildren<Renderer>();
-
-        // Create temporary white flash materials
-        Material[] originalMats = new Material[rends.Length];
-
-        for (int i = 0; i < rends.Length; i++)
-        {
-            originalMats[i] = rends[i].material;
-            rends[i].material.color = Color.white;
-        }
-
-        yield return new WaitForSeconds(duration);
-
-        // Restore original materials
-        for (int i = 0; i < rends.Length; i++)
-        {
-            if (rends[i] != null)
-                rends[i].material = originalMats[i];
-        }
-    }
-
 
     public void TakeDamage(int amount)
     {
@@ -59,9 +39,16 @@ public class Health : MonoBehaviour
         currentHP -= amount;
         onHurt?.Invoke();
 
-        // Flash player if they have a renderer flash method
-        if (player != null)
-            FlashRenderers(invincibleDuration);
+        // Flash enemy or player depending on component
+        var enemyFlash = GetComponent<EnemyFlash>();
+        if (enemyFlash != null)
+        {
+            enemyFlash.Flash();
+        }
+        else
+        {
+            StartCoroutine(PlayerFlash());
+        }
 
         if (currentHP <= 0)
         {
@@ -69,31 +56,21 @@ public class Health : MonoBehaviour
         }
         else
         {
-            // Start invincibility frames
             StartCoroutine(InvincibilityRoutine(invincibleDuration));
         }
     }
 
-    public void Heal(int amount)
+    private IEnumerator PlayerFlash()
     {
-        currentHP = Mathf.Clamp(currentHP + amount, 0, maxHP);
-    }
+        // Turn white
+        for (int i = 0; i < cachedRenderers.Length; i++)
+            cachedRenderers[i].material.color = Color.white;
 
-    private void Die()
-    {
-        onDie?.Invoke();
+        yield return new WaitForSeconds(0.15f);
 
-        GameManager gm = FindFirstObjectByType<GameManager>();
-
-        // If this is the player
-        if (gm != null && player != null)
-        {
-            gm.OnPlayerDeath();
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        // Restore
+        for (int i = 0; i < cachedRenderers.Length; i++)
+            cachedRenderers[i].material.color = originalColors[i];
     }
 
     private IEnumerator InvincibilityRoutine(float duration)
@@ -103,5 +80,19 @@ public class Health : MonoBehaviour
         isInvincible = false;
     }
 
+    private void Die()
+    {
+        onDie?.Invoke();
 
+        GameManager gm = FindFirstObjectByType<GameManager>();
+
+        if (gm != null && player != null)
+        {
+            gm.OnPlayerDeath();
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 }
